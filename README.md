@@ -50,3 +50,14 @@ npm test
 Then publish the `src/` folder. Players see "New version: update" on the menu, and installed apps check for one each time they come back to the foreground. To run the tests before every commit: `git config core.hooksPath .githooks`.
 
 GitHub Pages serves only the repo root or `/docs` from a branch, so publishing `src/` there needs a small Actions workflow that uploads the folder as is. `npm run icons` re-renders the PNG icons from `src/icons/icon.svg`.
+
+
+---- 
+
+Prompts:
+
+> a threejs game that combines arkanoid and tetris. The arkanoid paddle is on the top side, the tetris blocks appear in the middle of the playing field and fall towards the bottom side. The arkanoid ball breaks the falling pieces. Player 1 controls the tetris blocks, and player 2 controls the arkanoid paddle (or could be a control loop for 1-player games)
+
+> make a mobile-friendly version for P1
+
+> nice, but please arrange the keys as in a game boy : L/R/drop on the left and piece turning on the right
