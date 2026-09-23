@@ -12,6 +12,7 @@ import { initControls, updateControls, paddleDir } from './input/controls.js';
 import { initKeyboard } from './input/keyboard.js';
 import { initTouch } from './input/touch.js';
 import { initWakeLock } from './platform/wakelock.js';
+import { initPWA } from './platform/pwa.js';
 
 /* =========================================================
    Boot: build the scene, wire every module to the rules, start the loop
@@ -28,6 +29,7 @@ initControls();
 initWakeLock();
 initKeyboard();
 initTouch(stage);
+initPWA();
 
 /* pause when the app goes to the background (or, on desktop, loses focus) */
 document.addEventListener('visibilitychange', ()=>{

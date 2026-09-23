@@ -1,0 +1,4 @@
+#!/bin/sh
+# Runs the tests before each commit; they fail when src/ changed without
+# `npm run precache`. Enable once per clone: git config core.hooksPath .githooks
+exec npm test --silent

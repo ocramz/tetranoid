@@ -4,6 +4,7 @@ import { G } from '../game/state.js';
 import { setAuto } from '../game/paddle.js';
 import { start, togglePause, toMenu } from '../game/run.js';
 import { Snd } from '../fx/audio.js';
+import { canInstall, canUpdate, promptInstall, applyUpdate } from '../platform/pwa.js';
 
 /* =========================================================
    Screens: the veil over the field for the menu, pause and game over
@@ -18,6 +19,7 @@ export function initScreens(){
   on('resume', hide);
   on('over', ({why})=>showOver(why));
   on('mute', m=>{ const b=byId('vsnd'); if(b) b.textContent='Sound: '+(m?'off':'on'); });
+  on('pwa', showAppButtons);
 }
 
 function show(html){
@@ -64,12 +66,23 @@ slips past the paddle.</p>
 <div class="btns">
   <button class="go" id="btn1">Play solo, paddle on auto</button>
   <button class="go alt" id="btn2">Two players</button>
-</div>`;
+</div>
+<div class="btns" id="appbtns"></div>`;
 
 function showMenu(){
   show(MENU_HTML);
   byId('btn1').onclick=()=>play(true);
   byId('btn2').onclick=()=>play(false);
+  showAppButtons();
+}
+
+/* Install / update offers live on the menu only, never over a run. */
+function showAppButtons(){
+  const box=byId('appbtns'); if(!box || veil.classList.contains('hide')) return;   // menu on screen only
+  box.innerHTML=(canInstall() ? '<button class="go ghost" id="binstall">Install the app</button>' : '')
+               +(canUpdate() ? '<button class="go ghost" id="bupdate">New version: update</button>' : '');
+  if(canInstall()) byId('binstall').onclick=promptInstall;
+  if(canUpdate()) byId('bupdate').onclick=applyUpdate;
 }
 
 function showPause(){

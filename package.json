@@ -7,6 +7,8 @@
   "scripts": {
     "start": "npx -y http-server@14 . -c-1 -p 8080 -o /src/",
     "test": "node --test \"test/**/*.test.js\"",
-    "vendor": "node tools/vendor.mjs"
+    "precache": "node tools/precache.mjs",
+    "vendor": "node tools/vendor.mjs",
+    "icons": "npx -y @vite-pwa/assets-generator@2.0.0 --config tools/pwa-assets.config.js"
   }
 }
