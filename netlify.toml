@@ -1,0 +1,15 @@
+# Netlify serves src/ as is (no build step); the tests gate every deploy.
+[build]
+  publish = "src"
+  command = "npm test"
+
+# Browsers must always revalidate the service worker, or releases reach players late.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json"

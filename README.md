@@ -49,7 +49,9 @@ npm test
 
 Then publish the `src/` folder. Players see "New version: update" on the menu, and installed apps check for one each time they come back to the foreground. To run the tests before every commit: `git config core.hooksPath .githooks`.
 
-GitHub Pages serves only the repo root or `/docs` from a branch, so publishing `src/` there needs a small Actions workflow that uploads the folder as is. `npm run icons` re-renders the PNG icons from `src/icons/icon.svg`.
+The game is hosted on Netlify at https://tetranoid.netlify.app/. `netlify.toml` tells it to publish `src/` as is, after `npm test` passes. The repo is linked once in the Netlify UI, and every push to `main` then deploys. The canonical and Open Graph URLs in `src/index.html` point at that address, so update them if the site moves.
+
+`npm run icons` re-renders the PNG icons from `src/icons/icon.svg`. `npm run og` re-renders the 1200×630 link-preview banner `src/icons/og-image.png` from `tools/og-banner.html`, using headless Chromium via Playwright.
 
 
 ---- 
