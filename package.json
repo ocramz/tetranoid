@@ -1,0 +1,11 @@
+{
+  "name": "tetranoid",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Fan-art mashup of two beloved games, as an installable offline PWA with no build step",
+  "type": "module",
+  "scripts": {
+    "start": "npx -y http-server@14 . -c-1 -p 8080 -o /src/",
+    "vendor": "node tools/vendor.mjs"
+  }
+}
