@@ -1,0 +1,15 @@
+{
+  "name": "tetranoid",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Fan-art mashup of two beloved games, as an installable offline PWA with no build step",
+  "type": "module",
+  "scripts": {
+    "start": "npx -y http-server@14 . -c-1 -p 8080 -o /src/",
+    "test": "node --test \"test/**/*.test.js\"",
+    "precache": "node tools/precache.mjs",
+    "vendor": "node tools/vendor.mjs",
+    "icons": "npx -y @vite-pwa/assets-generator@2.0.0 --config tools/pwa-assets.config.js",
+    "og": "npx -y playwright@1 screenshot --viewport-size=1200,630 --wait-for-timeout=500 \"file://$PWD/tools/og-banner.html\" src/icons/og-image.png && npx -y pngquant-bin@9 --quality=70-90 --speed 1 --strip --force --output src/icons/og-image.png src/icons/og-image.png"
+  }
+}

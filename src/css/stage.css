@@ -1,0 +1,20 @@
+/* ---------------- field ---------------- */
+#stage{position:relative;flex:1 1 auto;min-height:0}
+canvas{display:block;width:100%;height:100%}
+
+.float{position:absolute;top:8px;right:8px;display:flex;gap:6px;z-index:6}
+.float button{width:40px;height:36px;border-radius:3px;background:var(--panel);
+      border:1px solid var(--edge);color:var(--dim);font-size:15px;font-family:inherit;
+      line-height:1;cursor:pointer}
+.float button:active{color:var(--ink);background:rgba(126,164,255,.18)}
+
+#pzone{position:absolute;left:0;right:0;top:0;height:30%;display:none;pointer-events:none;
+       border-bottom:1px dashed rgba(50,227,255,.28);
+       background:linear-gradient(180deg,rgba(50,227,255,.07),rgba(50,227,255,0))}
+body.twop.touch #pzone{display:block}
+#pzone b{position:absolute;right:9px;bottom:5px;font-size:10px;font-weight:600;
+         letter-spacing:.12em;color:rgba(50,227,255,.6)}
+
+#hint{position:absolute;left:0;right:0;bottom:6px;text-align:center;font-size:11.5px;
+      color:var(--dim);pointer-events:none}
+body.touch #hint{display:none}

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<!-- Source of src/icons/og-image.png, the 1200×630 link-preview banner.
+     `npm run og` screenshots this page; edit it, re-run, commit the PNG. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+@font-face{font-family:'Bungee';src:url(../src/fonts/bungee-latin-400.woff2) format('woff2')}
+@font-face{font-family:'Saira Condensed';font-weight:600;src:url(../src/fonts/saira-condensed-latin-600.woff2) format('woff2')}
+@font-face{font-family:'Saira Condensed';font-weight:400;src:url(../src/fonts/saira-condensed-latin-400.woff2) format('woff2')}
+:root{--ink:#e9efff;--dim:#8ba0c9;--p1:#ff4fb0;--p2:#32e3ff}
+html,body{margin:0;width:1200px;height:630px;overflow:hidden}
+body{position:relative;background:radial-gradient(ellipse 75% 90% at 38% 42%,#13204a,#070a16);
+     font-family:'Saira Condensed',sans-serif;color:var(--ink)}
+/* faint playfield grid, fading out toward the middle */
+.grid{position:absolute;inset:0;
+      background-image:linear-gradient(rgba(120,150,255,.07) 1px,transparent 1px),
+                       linear-gradient(90deg,rgba(120,150,255,.07) 1px,transparent 1px);
+      background-size:42px 42px;background-position:-1px -1px;
+      -webkit-mask-image:radial-gradient(ellipse 70% 70% at 50% 50%,transparent 30%,#000 100%)}
+.cells{position:absolute;inset:0}
+.cells i{position:absolute;width:38px;height:38px;border-radius:6px;opacity:.22}
+.wrap{position:absolute;inset:0;display:flex;align-items:center;gap:36px;padding:0 90px 0 70px}
+.logo{width:400px;height:400px;flex:none}
+.text{display:flex;flex-direction:column;gap:22px}
+h1{font-family:'Bungee',cursive;font-weight:400;font-size:170px;line-height:.92;margin:0;color:#fff;
+   text-shadow:6px 0 0 var(--p1),-6px 0 0 var(--p2),0 0 60px rgba(90,140,255,.6)}
+.tag{margin:0;font-size:44px;font-weight:600;letter-spacing:.01em;line-height:1.1}
+.tag .a{color:var(--p1)} .tag .b{color:var(--p2)}
+.sub{margin:0;font-size:38px;color:var(--dim);letter-spacing:.04em}
+</style>
+</head>
+<body>
+<div class="grid"></div>
+<div class="cells">
+  <!-- scattered blocks at the edges, grid-aligned (42px pitch, 2px inset) -->
+  <i style="left:2px;top:2px;background:#ffa02e"></i>
+  <i style="left:44px;top:2px;background:#ffa02e"></i>
+  <i style="left:2px;top:44px;background:#ffa02e"></i>
+  <i style="left:1136px;top:2px;background:#32e3ff"></i>
+  <i style="left:1136px;top:44px;background:#32e3ff"></i>
+  <i style="left:1136px;top:86px;background:#32e3ff"></i>
+  <i style="left:1136px;top:128px;background:#32e3ff"></i>
+  <i style="left:2px;top:590px;background:#52f08c"></i>
+  <i style="left:44px;top:590px;background:#52f08c"></i>
+  <i style="left:44px;top:548px;background:#52f08c"></i>
+  <i style="left:86px;top:548px;background:#52f08c"></i>
+  <i style="left:1052px;top:590px;background:#ff4fb0"></i>
+  <i style="left:1094px;top:590px;background:#ff4fb0"></i>
+  <i style="left:1136px;top:590px;background:#ff4fb0"></i>
+  <i style="left:1094px;top:548px;background:#ff4fb0"></i>
+</div>
+<div class="wrap">
+  <!-- the motif from src/icons/icon.svg, without its rounded-square background -->
+  <!-- <svg class="logo" viewBox="72 72 368 368" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+        <feGaussianBlur stdDeviation="8" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+    <rect x="172" y="112" width="168" height="26" rx="13" fill="#32e3ff" filter="url(#glow)"/>
+    <circle cx="300" cy="208" r="21" fill="#ffffff" filter="url(#glow)"/>
+    <g filter="url(#glow)">
+      <rect x="104" y="330" width="56" height="56" rx="9" fill="#ffa02e"/>
+      <rect x="166" y="330" width="56" height="56" rx="9" fill="#ffa02e"/>
+      <rect x="290" y="330" width="56" height="56" rx="9" fill="#52f08c"/>
+      <rect x="352" y="330" width="56" height="56" rx="9" fill="#52f08c"/>
+      <rect x="166" y="268" width="56" height="56" rx="9" fill="#ff4fb0"/>
+      <rect x="228" y="268" width="56" height="56" rx="9" fill="#ff4fb0"/>
+      <rect x="290" y="268" width="56" height="56" rx="9" fill="#ff4fb0"/>
+      <rect x="228" y="330" width="56" height="56" rx="9" fill="#ff4fb0"/>
+    </g>
+  </svg> -->
+
+  <!-- title -->
+  <div class="text">
+    <h1>TETRANOID</h1>
+    <p class="sub">Play free in your browser · works offline</p>
+  </div>
+</div>
+</body>
+</html>

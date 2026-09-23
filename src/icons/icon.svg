@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Tetranoid: player 2's paddle and ball above player 1's T completing a row.
+       Kept inside the central 80% circle so it also works as a maskable icon.
+       `npm run icons` renders the PNGs and favicon from this file. -->
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="75%">
+      <stop offset="0" stop-color="#13204a"/>
+      <stop offset="1" stop-color="#070a16"/>
+    </radialGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect x="172" y="112" width="168" height="26" rx="13" fill="#32e3ff" filter="url(#glow)"/>
+  <circle cx="300" cy="208" r="21" fill="#ffffff" filter="url(#glow)"/>
+  <g filter="url(#glow)">
+    <rect x="104" y="330" width="56" height="56" rx="9" fill="#ffa02e"/>
+    <rect x="166" y="330" width="56" height="56" rx="9" fill="#ffa02e"/>
+    <rect x="290" y="330" width="56" height="56" rx="9" fill="#52f08c"/>
+    <rect x="352" y="330" width="56" height="56" rx="9" fill="#52f08c"/>
+    <rect x="166" y="268" width="56" height="56" rx="9" fill="#ff4fb0"/>
+    <rect x="228" y="268" width="56" height="56" rx="9" fill="#ff4fb0"/>
+    <rect x="290" y="268" width="56" height="56" rx="9" fill="#ff4fb0"/>
+    <rect x="228" y="330" width="56" height="56" rx="9" fill="#ff4fb0"/>
+  </g>
+</svg>

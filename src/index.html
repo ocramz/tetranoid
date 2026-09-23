@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#070a16">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tetranoid">
+<meta name="description" content="Pieces sink, a ball runs loose: one player builds lines, the other keeps the ball alive and chews the stack apart.">
+<link rel="canonical" href="https://tetranoid.netlify.app/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Tetranoid">
+<meta property="og:title" content="Tetranoid">
+<meta property="og:description" content="Pieces sink, a ball runs loose: one player builds lines, the other keeps the ball alive and chews the stack apart.">
+<meta property="og:url" content="https://tetranoid.netlify.app/">
+<meta property="og:image" content="https://tetranoid.netlify.app/icons/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Tetranoid: a paddle and ball above falling tetromino blocks">
+<meta name="twitter:card" content="summary_large_image">
+<title>TETRANOID</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon.ico" sizes="48x48">
+<link rel="icon" href="icons/icon.svg" sizes="any" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon-180x180.png">
+<link rel="stylesheet" href="css/fonts.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/hud.css">
+<link rel="stylesheet" href="css/stage.css">
+<link rel="stylesheet" href="css/pad.css">
+<link rel="stylesheet" href="css/veil.css">
+<script defer src="vendor/three.min.js"></script>
+<script type="module" src="js/main.js"></script>
+</head>
+<body>
+
+<div id="hud">
+  <div class="card p1">
+    <div class="rowa"><span class="who">P1</span><span class="score" id="s1">0</span></div>
+    <div class="rowb">lines <b id="lines">0</b> · speed <b id="level">1</b></div>
+  </div>
+
+  <div id="nextwrap"><span class="nlab">next</span><div id="next"></div></div>
+
+  <div class="card p2">
+    <div class="rowa"><span class="who">P2</span><span class="score" id="s2">0</span></div>
+    <div class="rowb"><span class="balls" id="balls"></span><span id="mode">paddle: <b>auto</b></span></div>
+  </div>
+</div>
+
+<div id="stage">
+  <div id="pzone"><b>P2 — DRAG HERE</b></div>
+  <div class="float">
+    <button id="bSound" aria-label="Sound">♪</button>
+    <button id="bPause" aria-label="Pause">❚❚</button>
+  </div>
+  <div id="hint">A D move · W rotate · S soft drop · Shift slam · ← → paddle</div>
+
+  <div class="veil" id="veil"></div>
+</div>
+
+<div id="pad">
+  <div class="dpad">
+    <button class="db up" data-k="slam" aria-label="Slam to the floor">⤓</button>
+    <button class="db lf" data-k="left" aria-label="Move left">◀</button>
+    <button class="db rt" data-k="right" aria-label="Move right">▶</button>
+    <button class="db dn" data-k="soft" aria-label="Sink faster">▼</button>
+    <span class="dhub"></span>
+  </div>
+
+  <div class="mid">
+    <button class="pill" data-k="sound">SOUND</button>
+    <button class="pill" data-k="pause">PAUSE</button>
+  </div>
+
+  <div class="ab">
+    <button class="abb a" data-k="rotR" aria-label="Turn clockwise">↻</button>
+    <button class="abb b" data-k="rotL" aria-label="Turn anticlockwise">↺</button>
+  </div>
+</div>
+
+</body>
+</html>
