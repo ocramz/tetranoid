@@ -19,10 +19,9 @@ export function initHud(){
 
   /* ---- chrome buttons ---- */
   byId('bPause').onclick=()=>{ if(G.state==='playing'||G.state==='paused') togglePause(); };
-  byId('bSound').onclick=function(){
-    const m=Snd.toggle();
-    this.style.color = m ? 'rgba(139,160,201,.4)' : 'var(--p2)';
-  };
+  const bSound=byId('bSound');
+  bSound.onclick=()=>Snd.toggle();
+  on('mute', m=>{ bSound.style.color = m ? 'rgba(139,160,201,.4)' : 'var(--p2)'; });
   el.mode.onclick=()=>setAuto(!G.auto);
 }
 

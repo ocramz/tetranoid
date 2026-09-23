@@ -17,6 +17,7 @@ export function initScreens(){
   on('pause', showPause);
   on('resume', hide);
   on('over', ({why})=>showOver(why));
+  on('mute', m=>{ const b=byId('vsnd'); if(b) b.textContent='Sound: '+(m?'off':'on'); });
 }
 
 function show(html){
@@ -81,7 +82,7 @@ function showPause(){
   <button class="go alt" id="vquit">Quit to menu</button>
 </div>`);
   byId('vres').onclick=togglePause;
-  byId('vsnd').onclick=function(){ const m=Snd.toggle(); this.textContent='Sound: '+(m?'off':'on'); };
+  byId('vsnd').onclick=()=>Snd.toggle();
   byId('vpad').onclick=function(){ setAuto(!G.auto); this.textContent='Paddle: '+(G.auto?'auto':'player 2'); };
   byId('vquit').onclick=toMenu;
 }

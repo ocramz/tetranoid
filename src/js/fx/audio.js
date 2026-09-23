@@ -1,10 +1,14 @@
+import { emit } from '../events.js';
+
 /* =========================================================
    Blip synth
    ========================================================= */
 let ctx=null, muted=false;
+/* Create or wake the audio context; call it from a tap, click or key handler.
+   iOS leaves it 'interrupted' after the app has been in the background. */
 function ensure(){
   if(!ctx){ try{ ctx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return null; } }
-  if(ctx.state==='suspended') ctx.resume();
+  if(ctx.state==='suspended'||ctx.state==='interrupted') ctx.resume().catch(()=>{});
   return ctx;
 }
 function tone(f0,f1,dur,type,vol){
@@ -21,7 +25,8 @@ function tone(f0,f1,dur,type,vol){
 
 export const Snd = {
   ensure, tone,
-  toggle(){ muted=!muted; if(!muted) ensure(); return muted; },
+  /** Mute or unmute; every sound button follows the 'mute' event. */
+  toggle(){ muted=!muted; if(!muted) ensure(); emit('mute', muted); return muted; },
   isMuted(){ return muted; },
   wall(){ tone(520,480,0.05,'square',0.035); },
   paddle(){ tone(300,620,0.09,'square',0.07); },

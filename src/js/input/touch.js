@@ -4,6 +4,7 @@ import { takePaddle, aimPaddle } from '../game/paddle.js';
 import { togglePause } from '../game/run.js';
 import { Snd } from '../fx/audio.js';
 import { buzz } from '../fx/haptics.js';
+import { on } from '../events.js';
 import { layout, pointerToWorldX } from '../render/scene.js';
 import { hold } from './controls.js';
 
@@ -103,13 +104,14 @@ function initPad(){
       btn.addEventListener('click', ()=>{
         Snd.ensure();
         if(k==='pause'){ if(G.state==='playing'||G.state==='paused') togglePause(); }
-        else { const m=Snd.toggle(); btn.style.opacity = m?'.45':'1'; btn.textContent = m?'MUTED':'SOUND'; }
+        else Snd.toggle();
       });
+      if(k==='sound') on('mute', m=>{ btn.style.opacity = m?'.45':'1'; btn.textContent = m?'MUTED':'SOUND'; });
       return;
     }
     const held={left:'l', right:'r', soft:'d'}[k];
-    function press(on){
-      if(!on){ if(held) hold(held,false); return; }
+    function press(down){
+      if(!down){ if(held) hold(held,false); return; }
       Snd.ensure();
       if(G.state!=='playing') return;
       if(held) hold(held,true);
