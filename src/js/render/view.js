@@ -5,6 +5,7 @@ import { on } from '../events.js';
 import { G } from '../game/state.js';
 import { dropDistance } from '../game/piece.js';
 import { boxGeo, blockMat } from './materials.js';
+import { clearParticles } from './particles.js';
 import { blockRoot, pieceRoot, ghostPool, paddle, paddleGlow, ballMesh, ballLight, trail, dangerLine } from './scene.js';
 
 /* =========================================================
@@ -16,6 +17,7 @@ let shownPiece = null, shownShape = -1;
 
 export function initView(){
   on('serve', ()=>{ for(let i=0;i<trail.length;i++) trail[i].userData.p.set(G.ball.x,G.ball.y,0); });
+  for(const t of ['menu','start']) on(t, ()=>{ hideGhost(); clearParticles(); });
 }
 
 /** Every frame, after the rules have run. */
@@ -129,4 +131,4 @@ export function updateInPlay(){
   for(let i=used;i<ghostPool.length;i++) ghostPool[i].visible=false;
 }
 
-export function hideGhost(){ ghostPool.forEach(m=>{ m.visible=false; }); }
+function hideGhost(){ ghostPool.forEach(m=>{ m.visible=false; }); }

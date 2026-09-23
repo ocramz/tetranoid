@@ -19,7 +19,8 @@ export function predictX(){
   if(u>span) u=2*span-u;
   return u-lim;
 }
-export function updatePaddle(dt, keys){
+/** dir: -1 / 0 / +1 from player 2's keys (ignored while the machine plays). */
+export function updatePaddle(dt, dir){
   const limit=HALF_W-PADDLE_HW;
   const prev=G.paddleX;
   if(G.auto){
@@ -28,9 +29,6 @@ export function updatePaddle(dt, keys){
     const v=clamp(d*9, -13.5, 13.5);
     G.paddleX=clamp(G.paddleX+v*dt, -limit, limit);
   } else {
-    let dir=0;
-    if(keys.pl) dir-=1;
-    if(keys.pr) dir+=1;
     if(dir!==0) G.paddleTarget=clamp(G.paddleTarget+dir*17*dt,-limit,limit);
     G.paddleTarget=clamp(G.paddleTarget,-limit,limit);
     G.paddleX += (G.paddleTarget-G.paddleX)*Math.min(1,dt*22);
@@ -42,3 +40,7 @@ export function setAuto(v){
   G.auto=v;
   if(!v) G.paddleTarget=G.paddleX;
 }
+/** Player 2 grabs the paddle (arrow keys, mouse, drag in the top band). */
+export function takePaddle(){ if(G.auto) setAuto(false); }
+/** Player 2 points the paddle at world x. */
+export function aimPaddle(x){ G.paddleTarget=clamp(x,-(HALF_W-PADDLE_HW),HALF_W-PADDLE_HW); }

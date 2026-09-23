@@ -1,11 +1,19 @@
+import { on } from '../events.js';
+
 /* keep the screen on while playing */
 let wakeLock=null;
-export function keepAwake(on){
+
+export function initWakeLock(){
+  for(const t of ['start','resume']) on(t, ()=>keepAwake(true));
+  for(const t of ['pause','over','menu']) on(t, ()=>keepAwake(false));
+}
+
+function keepAwake(awake){
   try{
-    if(on && 'wakeLock' in navigator && !wakeLock){
+    if(awake && 'wakeLock' in navigator && !wakeLock){
       navigator.wakeLock.request('screen').then(w=>{
         wakeLock=w; w.addEventListener('release',()=>{wakeLock=null;});
       }).catch(()=>{});
-    } else if(!on && wakeLock){ wakeLock.release().catch(()=>{}); wakeLock=null; }
+    } else if(!awake && wakeLock){ wakeLock.release().catch(()=>{}); wakeLock=null; }
   }catch(e){}
 }

@@ -79,6 +79,11 @@ export function stepDown(soft){
     if(soft) G.s1+=1;
   } else G.grounded=true;
 }
+/** Sink n rows now (held S, the pad, drag down), restarting the gravity timer. */
+export function softDrop(n=1){
+  for(let i=0;i<n;i++) stepDown(true);
+  G.fallT=0;
+}
 export function hardDrop(){
   const p=G.piece; if(!p) return;
   let n=0;
