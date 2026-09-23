@@ -3,13 +3,12 @@ import { cx, cy, PADDLE_Y } from '../config.js';
 import { Snd } from './audio.js';
 import { buzz } from './haptics.js';
 import { burst } from '../render/particles.js';
+import { shake, setShake } from '../render/scene.js';
 
 /* What each game event sounds, feels and looks like: the "juice", tunable in one place.
    shake(amount, cap) sets the camera shake to min(shake + amount, cap), which can also
    lower it; ball loss and game over set it outright. */
-export function initFeedback(camRig){
-  const shake = (amount, cap) => { camRig.shake = Math.min(camRig.shake + amount, cap); };
-
+export function initFeedback(){
   on('rotate',       () => { Snd.tone(660,880,0.04,'triangle',0.04); buzz(6); });
   on('lock',         () => { Snd.lock(); buzz(8); shake(0.10, 0.5); });
   on('rowCleared',   ({row, colors}) => colors.forEach((color, col) => burst(cx(col), cy(row), color, 7, 1.25)));
@@ -19,6 +18,6 @@ export function initFeedback(camRig){
   on('chip',         ({row, col, color}) => { burst(cx(col), cy(row), color, 9, 1); Snd.smash(); shake(0.18, 0.7); });
   on('wall',         () => Snd.wall());
   on('paddleHit',    ({auto}) => { Snd.paddle(); if(!auto) buzz(10); shake(0.1, 0.45); });
-  on('ballLost',     ({x}) => { Snd.lost(); buzz(45); burst(x, PADDLE_Y+0.6, 0x32e3ff, 16, 1.4); camRig.shake = 0.8; });
-  on('over',         () => { Snd.over(); buzz([0,60,70,120]); camRig.shake = 1.0; });
+  on('ballLost',     ({x}) => { Snd.lost(); buzz(45); burst(x, PADDLE_Y+0.6, 0x32e3ff, 16, 1.4); setShake(0.8); });
+  on('over',         () => { Snd.over(); buzz([0,60,70,120]); setShake(1.0); });
 }

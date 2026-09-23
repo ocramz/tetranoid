@@ -1,457 +1,34 @@
-import THREE from './render/three.js';
 import { isCoarse } from './device.js';
-import { clamp, rnd, byId } from './util.js';
-import { COLS, ROWS, DANGER_ROW, SPAWN_TOP, BALL_R, PADDLE_Y, PADDLE_HH, PADDLE_HW, HALF_W, HALF_H,
-         cx, cy, PIECES } from './config.js';
+import { clamp, byId } from './util.js';
+import { COLS, ROWS, DANGER_ROW, PADDLE_HW, HALF_W, FALL_BASE, cx, cy } from './config.js';
+import { on } from './events.js';
 import { Snd } from './fx/audio.js';
 import { buzz } from './fx/haptics.js';
-import { boxGeo, ghostMat, blockMat, initMaterials } from './render/materials.js';
-import { initParticles, updateParts, clearParticles } from './render/particles.js';
-import { keepAwake } from './platform/wakelock.js';
-import { emit } from './events.js';
 import { initFeedback } from './fx/feedback.js';
+import { initScene, resize, pointerToWorldX, updateCamera, render, layout,
+         blockRoot, pieceRoot, ghostRoot, ghostPool, ballMesh, ballLight, trail, dangerLine } from './render/scene.js';
+import { updateParts, clearParticles } from './render/particles.js';
+import { keepAwake } from './platform/wakelock.js';
+import { G, newBoard, retune } from './game/state.js';
+import { refillBag, pullPiece, collides, tryRotate, movePiece, spawnPiece, stepDown, hardDrop, lockPiece } from './game/piece.js';
+import { updateBall } from './game/ball.js';
+import { updatePaddle, setAuto } from './game/paddle.js';
 
 if(isCoarse) document.body.classList.add('touch');
 
-/* =========================================================
-   Scene
-   ========================================================= */
 const stage = byId('stage');
-const pzone = byId('pzone');
-const renderer = new THREE.WebGLRenderer({antialias:!isCoarse, alpha:false, powerPreference:'high-performance'});
-renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, isCoarse?1.75:2));
-renderer.outputEncoding = THREE.sRGBEncoding;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.12;
-stage.appendChild(renderer.domElement);
+initScene(stage, byId('pzone'));
+initFeedback();
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x070a16);
-
-const camera = new THREE.PerspectiveCamera(44, 1, 0.1, 200);
-const camRig = {dist:30, shake:0};
-
-scene.add(new THREE.HemisphereLight(0x7fa8ff, 0x0a0d1c, 0.55));
-const key = new THREE.DirectionalLight(0xffffff, 0.75); key.position.set(7,9,16); scene.add(key);
-const rim = new THREE.DirectionalLight(0xff77c4, 0.35); rim.position.set(-9,-6,8); scene.add(rim);
-const ballLight = new THREE.PointLight(0x66e9ff, 2.4, 13, 2); scene.add(ballLight);
-
-(function backdrop(){
-  const s=64, cv=document.createElement('canvas'); cv.width=cv.height=s;
-  const g=cv.getContext('2d');
-  g.strokeStyle='rgba(120,168,255,0.20)'; g.lineWidth=2;
-  g.strokeRect(1,1,s-2,s-2);
-  const tex=new THREE.CanvasTexture(cv);
-  tex.wrapS=tex.wrapT=THREE.RepeatWrapping; tex.repeat.set(COLS,ROWS);
-  const panel=new THREE.Mesh(new THREE.PlaneGeometry(COLS,ROWS),
-    new THREE.MeshBasicMaterial({map:tex,transparent:true,opacity:0.65}));
-  panel.position.z=-0.62; scene.add(panel);
-  const bg=new THREE.Mesh(new THREE.PlaneGeometry(COLS,ROWS),
-    new THREE.MeshBasicMaterial({color:0x0b1226}));
-  bg.position.z=-0.7; scene.add(bg);
-})();
-
-function frameBar(w,h,x,y,color){
-  const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,1.3),
-    new THREE.MeshStandardMaterial({color:0x121a33, emissive:color, emissiveIntensity:0.55,
-      roughness:0.4, metalness:0.2}));
-  m.position.set(x,y,0); scene.add(m); return m;
-}
-frameBar(0.35, ROWS+0.7, -HALF_W-0.175, 0, 0x2a55b8);
-frameBar(0.35, ROWS+0.7,  HALF_W+0.175, 0, 0x2a55b8);
-frameBar(COLS+0.7, 0.35, 0, -HALF_H-0.175, 0xff2f92);
-
-const dangerLine = new THREE.Mesh(
-  new THREE.PlaneGeometry(COLS, 0.07),
-  new THREE.MeshBasicMaterial({color:0xffc63d, transparent:true, opacity:0.35}));
-dangerLine.position.set(0, cy(DANGER_ROW)-0.5, -0.4);
-scene.add(dangerLine);
-
-const paddleMat = new THREE.MeshStandardMaterial({color:0x0d2b3a, emissive:0x32e3ff,
-  emissiveIntensity:1.0, roughness:0.28, metalness:0.25});
-const paddle = new THREE.Mesh(new THREE.BoxGeometry(PADDLE_HW*2, PADDLE_HH*2, 1.0), paddleMat);
-paddle.position.set(0, PADDLE_Y, 0);
-scene.add(paddle);
-const paddleGlow = new THREE.PointLight(0x32e3ff, 1.1, 9, 2);
-paddleGlow.position.set(0, PADDLE_Y, 1.2); scene.add(paddleGlow);
-
-const ballMesh = new THREE.Mesh(new THREE.SphereGeometry(BALL_R, 22, 16),
-  new THREE.MeshStandardMaterial({color:0xffffff, emissive:0xa8f0ff, emissiveIntensity:1.5, roughness:0.2}));
-scene.add(ballMesh);
-
-const TRAIL_N = isCoarse ? 6 : 9;
-const trail=[];
-for(let i=0;i<TRAIL_N;i++){
-  const t=new THREE.Mesh(new THREE.SphereGeometry(BALL_R*0.82,10,8),
-    new THREE.MeshBasicMaterial({color:0x7fe6ff, transparent:true, opacity:0.0}));
-  t.userData.p=new THREE.Vector3(); scene.add(t); trail.push(t);
-}
-
-initMaterials();
-
-const blockRoot = new THREE.Group(); scene.add(blockRoot);
-const pieceRoot = new THREE.Group(); scene.add(pieceRoot);
-const ghostRoot = new THREE.Group(); scene.add(ghostRoot);
-
-initParticles(scene);
-initFeedback(camRig);
-
-/* =========================================================
-   State
-   ========================================================= */
-const G = {
-  state:'menu',
-  board:[], piece:null, bag:[], next:null,
-  fallT:0, fallEvery:0.34, time:0,
-  lockT:0, lockResets:0, grounded:false,
-  lines:0, level:1, s1:0, s2:0, balls:3,
-  ball:{x:0,y:PADDLE_Y-1.5,vx:0,vy:0,speed:11,alive:false},
-  serveT:0,
-  paddleX:0, paddleVX:0, paddleTarget:0, aiErr:0,
-  auto:true
-};
-const UI = {cellPx:28, zoneY:200};
-
-function newBoard(){
-  G.board=[];
-  for(let r=0;r<ROWS;r++) G.board.push(new Array(COLS).fill(null));
-}
 function clearMeshes(){
   while(blockRoot.children.length) blockRoot.remove(blockRoot.children[0]);
   while(pieceRoot.children.length) pieceRoot.remove(pieceRoot.children[0]);
   ghostRoot.children.forEach(m=>{ m.visible=false; });
 }
 
-/* ---- pieces ---- */
-function refillBag(){
-  const b=[0,1,2,3,4,5,6];
-  for(let i=b.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; const t=b[i]; b[i]=b[j]; b[j]=t; }
-  G.bag=G.bag.concat(b);
-}
-function pullPiece(){
-  if(G.bag.length<2) refillBag();
-  const def=PIECES[G.bag.shift()];
-  const m=def.m.map(row=>row.slice());
-  return {name:def.n, color:def.c, m, size:m.length,
-          px:Math.floor((COLS-m.length)/2), py:SPAWN_TOP};
-}
-function pieceCells(p){
-  const out=[];
-  for(let r=0;r<p.size;r++) for(let c=0;c<p.size;c++)
-    if(p.m[r][c]) out.push([p.py-r, p.px+c, r, c]);
-  return out;
-}
-function collides(p, px, py, m){
-  m=m||p.m; px=(px===undefined?p.px:px); py=(py===undefined?p.py:py);
-  for(let r=0;r<m.length;r++) for(let c=0;c<m.length;c++){
-    if(!m[r][c]) continue;
-    const br=py-r, bc=px+c;
-    if(bc<0||bc>=COLS||br<0) return true;
-    if(br<ROWS && G.board[br][bc]) return true;
-  }
-  return false;
-}
-function rotate(m, dir){
-  const n=m.length, o=[];
-  for(let r=0;r<n;r++) o.push(new Array(n).fill(0));
-  for(let r=0;r<n;r++) for(let c=0;c<n;c++){
-    if(dir>0) o[r][c]=m[n-1-c][r];
-    else      o[r][c]=m[c][n-1-r];
-  }
-  return o;
-}
-function tryRotate(dir){
-  const p=G.piece; if(!p) return;
-  const m=rotate(p.m,dir);
-  const kicks=[0,-1,1,-2,2];
-  for(let i=0;i<kicks.length;i++){
-    if(!collides(p, p.px+kicks[i], p.py, m)){
-      p.m=m; p.px+=kicks[i];
-      resetLock(); syncPiece(); emit('rotate');
-      return;
-    }
-  }
-}
-function movePiece(dx){
-  const p=G.piece; if(!p) return false;
-  if(!collides(p, p.px+dx, p.py)){ p.px+=dx; resetLock(); syncPiece(); return true; }
-  return false;
-}
-function resetLock(){ if(G.grounded && G.lockResets<8){ G.lockT=0; G.lockResets++; } }
-
-function spawnPiece(){
-  G.piece = G.next || pullPiece();
-  G.next  = pullPiece();
-  G.fallT=0; G.lockT=0; G.lockResets=0; G.grounded=false;
-  drawNext();
-  if(collides(G.piece)){ gameOver('stack'); return; }
-  buildPieceMeshes();
-  pieceRoot.position.set(cx(G.piece.px), cy(G.piece.py), 0);
-}
-function buildPieceMeshes(){
-  while(pieceRoot.children.length) pieceRoot.remove(pieceRoot.children[0]);
-  const p=G.piece; if(!p) return;
-  for(let r=0;r<p.size;r++) for(let c=0;c<p.size;c++){
-    if(!p.m[r][c]) continue;
-    const mesh=new THREE.Mesh(boxGeo, blockMat(p.color,false));
-    mesh.position.set(c, -r, 0);
-    mesh.userData.rc=r*10+c;
-    pieceRoot.add(mesh);
-  }
-}
-function syncPiece(){
-  const p=G.piece; if(!p) return;
-  const have={};
-  pieceRoot.children.forEach(m=>{ have[m.userData.rc]=m; });
-  let need=0;
-  for(let r=0;r<p.size;r++) for(let c=0;c<p.size;c++) if(p.m[r][c]) need++;
-  if(need!==pieceRoot.children.length){ buildPieceMeshes(); return; }
-  let ok=true;
-  for(let r=0;r<p.size && ok;r++) for(let c=0;c<p.size && ok;c++)
-    if(p.m[r][c] && !have[r*10+c]) ok=false;
-  if(!ok) buildPieceMeshes();
-}
-function stepDown(soft){
-  const p=G.piece; if(!p) return;
-  if(!collides(p, p.px, p.py-1)){
-    p.py--; G.grounded=false; G.lockT=0;
-    if(soft) G.s1+=1;
-  } else G.grounded=true;
-}
-function hardDrop(){
-  const p=G.piece; if(!p) return;
-  let n=0;
-  while(!collides(p,p.px,p.py-1)){ p.py--; n++; }
-  G.s1+=n*2;
-  pieceRoot.position.y=cy(p.py);
-  lockPiece();
-}
-function lockPiece(){
-  const p=G.piece; if(!p) return;
-  const cells=pieceCells(p);
-  if(!cells.length){ spawnPiece(); return; }
-  let top=-1;
-  cells.forEach(([br,bc])=>{
-    if(br<0||br>=ROWS||bc<0||bc>=COLS) return;
-    const mesh=new THREE.Mesh(boxGeo, blockMat(p.color,false));
-    mesh.position.set(cx(bc), cy(br), 0);
-    blockRoot.add(mesh);
-    G.board[br][bc]={color:p.color, hp:2, mesh};
-    if(br>top) top=br;
-  });
-  while(pieceRoot.children.length) pieceRoot.remove(pieceRoot.children[0]);
-  G.piece=null;
-  G.s1+=12;
-  emit('lock');
-  const cleared=clearLines();
-  if(top>=DANGER_ROW && cleared===0){ gameOver('stack'); return; }
-  spawnPiece();
-}
-function retune(){
-  const lv = 1 + Math.floor(G.lines/4) + Math.floor(G.time/50);
-  G.level = lv;
-  G.fallEvery = Math.max(0.15, (isCoarse?0.34:0.30)*Math.pow(0.90, lv-1));
-}
-function clearLines(){
-  let cleared=0;
-  for(let r=0;r<ROWS;r++){
-    let full=true;
-    for(let c=0;c<COLS;c++) if(!G.board[r][c]){ full=false; break; }
-    if(!full) continue;
-    cleared++;
-    const colors=[];
-    for(let c=0;c<COLS;c++){
-      const cell=G.board[r][c];
-      colors.push(cell.color);
-      blockRoot.remove(cell.mesh);
-      G.board[r][c]=null;
-    }
-    emit('rowCleared', {row:r, colors});
-    for(let rr=r;rr<ROWS-1;rr++) G.board[rr]=G.board[rr+1];
-    G.board[ROWS-1]=new Array(COLS).fill(null);
-    r--;
-  }
-  if(cleared){
-    const table=[0,100,300,500,800];
-    G.s1 += table[Math.min(cleared,4)]*G.level;
-    G.lines+=cleared;
-    retune();
-    emit('linesCleared', {n:cleared});
-  }
-  return cleared;
-}
-
-/* ---- destruction ---- */
-function damageCell(row,col,fromBall){
-  if(row<0||row>=ROWS||col<0||col>=COLS) return;
-  const cell=G.board[row][col];
-  if(cell){
-    cell.hp--;
-    if(cell.hp<=0){
-      blockRoot.remove(cell.mesh);
-      G.board[row][col]=null;
-      if(fromBall) G.s2+=40;
-      emit('smash', {row, col, color:cell.color});
-    } else {
-      cell.mesh.material=blockMat(cell.color,true);
-      cell.mesh.scale.setScalar(0.82);
-      if(fromBall) G.s2+=10;
-      emit('crack', {row, col, color:cell.color});
-    }
-    return;
-  }
-  const p=G.piece;
-  if(p){
-    const r=p.py-row, c=col-p.px;
-    if(r>=0&&r<p.size&&c>=0&&c<p.size&&p.m[r][c]){
-      p.m[r][c]=0;
-      if(fromBall) G.s2+=55;
-      emit('chip', {row, col, color:p.color});
-      buildPieceMeshes();
-      if(pieceCells(p).length===0){ G.piece=null; spawnPiece(); }
-    }
-  }
-}
-function occupied(row,col){
-  if(row<0||row>=ROWS||col<0||col>=COLS) return false;
-  if(G.board[row][col]) return true;
-  const p=G.piece;
-  if(p){
-    const r=p.py-row, c=col-p.px;
-    if(r>=0&&r<p.size&&c>=0&&c<p.size&&p.m[r][c]) return true;
-  }
-  return false;
-}
-
-/* =========================================================
-   Ball
-   ========================================================= */
-function serveBall(){
-  const b=G.ball;
-  b.x=clamp(G.paddleX,-HALF_W+1,HALF_W-1);
-  b.y=PADDLE_Y-1.1;
-  b.speed=10.8+Math.min(G.level*0.35,3);
-  const a=rnd(-0.5,0.5);
-  b.vx=Math.sin(a)*b.speed;
-  b.vy=-Math.cos(a)*b.speed;
-  b.alive=true;
-  G.aiErr=rnd(-0.7,0.7);
-  for(let i=0;i<trail.length;i++) trail[i].userData.p.set(b.x,b.y,0);
-}
-function loseBall(){
-  const b=G.ball; b.alive=false;
-  G.balls--;
-  emit('ballLost', {x:b.x});
-  drawBalls();
-  if(G.balls<=0){ gameOver('balls'); return; }
-  G.serveT=1.1;
-}
-function hitAxis(axis){
-  const b=G.ball, eps=1e-4;
-  const c0=Math.floor(b.x-BALL_R+eps+HALF_W), c1=Math.floor(b.x+BALL_R-eps+HALF_W);
-  const r0=Math.floor(b.y-BALL_R+eps+HALF_H), r1=Math.floor(b.y+BALL_R-eps+HALF_H);
-  for(let r=r0;r<=r1;r++) for(let c=c0;c<=c1;c++){
-    if(!occupied(r,c)) continue;
-    if(axis==='x'){
-      if(b.vx>0) b.x = (c-HALF_W) - BALL_R - 0.002;
-      else       b.x = (c+1-HALF_W) + BALL_R + 0.002;
-      b.vx=-b.vx;
-    } else {
-      if(b.vy>0) b.y = (r-HALF_H) - BALL_R - 0.002;
-      else       b.y = (r+1-HALF_H) + BALL_R + 0.002;
-      b.vy=-b.vy;
-    }
-    damageCell(r,c,true);
-    return true;
-  }
-  return false;
-}
-function updateBall(dt){
-  const b=G.ball;
-  if(!b.alive){
-    if(G.serveT>0){ G.serveT-=dt; if(G.serveT<=0) serveBall(); }
-    return;
-  }
-  const dist=Math.hypot(b.vx,b.vy)*dt;
-  const steps=clamp(Math.ceil(dist/0.18),1,24);
-  const sdt=dt/steps;
-  for(let s=0;s<steps;s++){
-    b.x+=b.vx*sdt; hitAxis('x');
-    b.y+=b.vy*sdt; hitAxis('y');
-
-    if(b.x-BALL_R < -HALF_W){ b.x=-HALF_W+BALL_R; b.vx=Math.abs(b.vx); emit('wall'); }
-    else if(b.x+BALL_R > HALF_W){ b.x=HALF_W-BALL_R; b.vx=-Math.abs(b.vx); emit('wall'); }
-    if(b.y-BALL_R < -HALF_H){ b.y=-HALF_H+BALL_R; b.vy=Math.abs(b.vy); emit('wall'); }
-
-    if(b.vy>0 && b.y+BALL_R > PADDLE_Y-PADDLE_HH && b.y-BALL_R < PADDLE_Y+PADDLE_HH){
-      if(Math.abs(b.x-G.paddleX) < PADDLE_HW+BALL_R*0.85){
-        b.y = PADDLE_Y-PADDLE_HH-BALL_R-0.002;
-        const off = clamp((b.x-G.paddleX)/PADDLE_HW,-1,1);
-        b.speed = Math.min(b.speed+0.22, 20);
-        const ang = off*0.95 + G.paddleVX*0.012;
-        b.vx = Math.sin(ang)*b.speed;
-        b.vy = -Math.abs(Math.cos(ang))*b.speed;
-        emit('paddleHit', {auto:G.auto});
-      }
-    }
-    if(b.y > HALF_H+0.7){ loseBall(); return; }
-  }
-
-  const sp=Math.hypot(b.vx,b.vy)||1;
-  if(Math.abs(b.vy) < sp*0.22){
-    b.vy = (b.vy>=0?1:-1)*sp*0.24;
-    const k=sp/(Math.hypot(b.vx,b.vy)||1); b.vx*=k; b.vy*=k;
-  }
-  const rc=Math.floor(b.y+HALF_H), cc=Math.floor(b.x+HALF_W);
-  if(occupied(rc,cc)) damageCell(rc,cc,true);
-}
-
-/* =========================================================
-   Paddle
-   ========================================================= */
-function predictX(){
-  const b=G.ball;
-  if(!b.alive) return 0;
-  if(b.vy<=0) return b.x*0.35;
-  const targetY = PADDLE_Y-PADDLE_HH-BALL_R;
-  const t=(targetY-b.y)/b.vy;
-  if(t<0) return b.x;
-  const x=b.x+b.vx*t;
-  const lim=HALF_W-BALL_R, span=2*lim;
-  let u=((x+lim)%(2*span)+2*span)%(2*span);
-  if(u>span) u=2*span-u;
-  return u-lim;
-}
-function updatePaddle(dt, keys){
-  const limit=HALF_W-PADDLE_HW;
-  const prev=G.paddleX;
-  if(G.auto){
-    const want=clamp(predictX()+G.aiErr, -limit, limit);
-    const d=want-G.paddleX;
-    const v=clamp(d*9, -13.5, 13.5);
-    G.paddleX=clamp(G.paddleX+v*dt, -limit, limit);
-  } else {
-    let dir=0;
-    if(keys.pl) dir-=1;
-    if(keys.pr) dir+=1;
-    if(dir!==0) G.paddleTarget=clamp(G.paddleTarget+dir*17*dt,-limit,limit);
-    G.paddleTarget=clamp(G.paddleTarget,-limit,limit);
-    G.paddleX += (G.paddleTarget-G.paddleX)*Math.min(1,dt*22);
-  }
-  G.paddleVX=(G.paddleX-prev)/Math.max(dt,0.0001);
-  paddle.position.x=G.paddleX;
-  paddleGlow.position.x=G.paddleX;
-}
-
 /* =========================================================
    Ghost
    ========================================================= */
-const ghostPool=[];
-for(let i=0;i<16;i++){
-  const m=new THREE.Mesh(boxGeo, ghostMat);
-  m.scale.setScalar(0.94); m.visible=false;
-  ghostRoot.add(m); ghostPool.push(m);
-}
 function updateGhost(){
   let used=0;
   const p=G.piece;
@@ -509,8 +86,11 @@ function drawHUD(){
   if(hudCache.level!==G.level){ el.level.textContent=G.level; hudCache.level=G.level; }
   if(hudCache.auto!==G.auto){
     el.mode.innerHTML='paddle: <b>'+(G.auto?'auto':'you')+'</b>';
+    document.body.classList.toggle('twop', !G.auto);
     hudCache.auto=G.auto;
   }
+  if(hudCache.balls!==G.balls){ drawBalls(); hudCache.balls=G.balls; }
+  if(hudCache.next!==G.next){ drawNext(); hudCache.next=G.next; }
 }
 function showVeil(html){
   el.veil.innerHTML=html;
@@ -575,7 +155,7 @@ function startGame(auto){
   Snd.ensure();
   G.state='playing';
   G.lines=0; G.level=1; G.s1=0; G.s2=0; G.balls=3;
-  G.fallEvery=isCoarse?0.34:0.30; G.time=0; G.bag=[]; G.next=null; G.piece=null;
+  G.fallEvery=FALL_BASE; G.time=0; G.bag=[]; G.next=null; G.piece=null;
   G.paddleX=0; G.paddleTarget=0; G.serveT=0.9; G.ball.alive=false;
   hudCache={};
   setAuto(auto);
@@ -585,15 +165,13 @@ function startGame(auto){
   refillBag();
   G.next=pullPiece();
   spawnPiece();
-  drawBalls(); drawNext(); drawHUD();
+  drawHUD();
   hideVeil();
   keepAwake(true);
 }
-function gameOver(why){
-  if(G.state==='over') return;
-  G.state='over';
+/* the rules end the run (state.gameOver); this shows it */
+on('over', ({why})=>{
   resetKeys();
-  emit('over', {why});
   keepAwake(false);
   const ballsOut = (why==='balls');
   const head = ballsOut ? 'BALL LOST' : 'FIELD BURIED';
@@ -613,7 +191,7 @@ function gameOver(why){
     '</div>');
   byId('again').onclick=()=>startGame(G.auto);
   byId('quit').onclick=showMenu;
-}
+});
 function togglePause(){
   if(G.state==='playing'){
     G.state='paused';
@@ -635,12 +213,6 @@ function togglePause(){
   } else if(G.state==='paused'){
     G.state='playing'; hideVeil(); keepAwake(true);
   }
-}
-function setAuto(v){
-  G.auto=v;
-  if(!v) G.paddleTarget=G.paddleX;
-  document.body.classList.toggle('twop', !v);
-  hudCache.auto=null; drawHUD();
 }
 
 /* =========================================================
@@ -681,22 +253,13 @@ document.addEventListener('visibilitychange', ()=>{
 });
 window.addEventListener('blur', ()=>{ if(!isCoarse && G.state==='playing') togglePause(); });
 
-/* ---- screen coordinates ---- */
-function pointerToWorldX(clientX){
-  const rect=renderer.domElement.getBoundingClientRect();
-  const nx=((clientX-rect.left)/rect.width)*2-1;
-  const vFov=camera.fov*Math.PI/180;
-  const halfW=Math.tan(vFov/2)*camRig.dist*camera.aspect;
-  return nx*halfW;
-}
-
 /* ---- field gestures: P1 pieces (touch) / P2 paddle ---- */
 const g={id:null, mode:null, x0:0, y0:0, lx:0, ly:0, t0:0,
          sx:0, sy:0, st:0, moved:false, slammed:false};
 
 function paddleZoneHit(clientY){
   const rect=stage.getBoundingClientRect();
-  return (clientY-rect.top) < UI.zoneY;
+  return (clientY-rect.top) < layout.zoneY;
 }
 stage.addEventListener('pointerdown', e=>{
   if(e.target.closest('button')||e.target.closest('.veil')) return;
@@ -730,7 +293,7 @@ stage.addEventListener('pointermove', e=>{
   }
 
   /* piece gestures */
-  const step = Math.max(14, UI.cellPx*0.72);
+  const step = Math.max(14, layout.cellPx*0.72);
   const dx = e.clientX-g.lx;
   if(Math.abs(dx)>=step){
     const n=Math.trunc(dx/step), dir=n>0?1:-1;
@@ -749,7 +312,7 @@ stage.addEventListener('pointermove', e=>{
   if(now-g.st > 90){ g.sx=e.clientX; g.sy=e.clientY; g.st=now; }
 
   if(!g.slammed){
-    const sstep=Math.max(13, UI.cellPx*0.55);
+    const sstep=Math.max(13, layout.cellPx*0.55);
     const dy=e.clientY-g.ly;
     if(dy>=sstep){
       const n=Math.trunc(dy/sstep);
@@ -819,25 +382,6 @@ el.mode.onclick=()=>setAuto(!G.auto);
 /* =========================================================
    Resize
    ========================================================= */
-function resize(){
-  const w=Math.max(1, stage.clientWidth), h=Math.max(1, stage.clientHeight);
-  renderer.setSize(w,h,false);
-  camera.aspect=w/h;
-  const fitH=ROWS+1.5, fitW=COLS+1.5;
-  const vFov=camera.fov*Math.PI/180;
-  const dH=(fitH/2)/Math.tan(vFov/2);
-  const hFov=2*Math.atan(Math.tan(vFov/2)*camera.aspect);
-  const dW=(fitW/2)/Math.tan(hFov/2);
-  camRig.dist=Math.max(dH,dW)*1.03;
-  camera.updateProjectionMatrix();
-
-  const visH=2*Math.tan(vFov/2)*camRig.dist;
-  const visW=visH*camera.aspect;
-  UI.cellPx = w/visW;
-  const yw=cy(DANGER_ROW)-0.5;
-  UI.zoneY = clamp((0.5 - yw/visH)*h, 70, h*0.55);
-  pzone.style.height = Math.round(UI.zoneY)+'px';
-}
 window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', ()=>setTimeout(resize,250));
 if(window.visualViewport) visualViewport.addEventListener('resize', resize);
@@ -923,19 +467,13 @@ function frame(now){
   dangerLine.material.opacity=0.18+near*(0.35+0.3*Math.sin(tick*7));
   dangerLine.material.color.setHex(near>0.6?0xff4d4d:0xffc63d);
 
-  camRig.shake=Math.max(0,camRig.shake-dt*2.2);
-  const tilt=0.13;
-  const sx=(Math.random()-0.5)*camRig.shake*0.8;
-  const sy=(Math.random()-0.5)*camRig.shake*0.8;
-  camera.position.set(sx, -Math.sin(tilt)*camRig.dist+sy, Math.cos(tilt)*camRig.dist);
-  camera.lookAt(0,0,0);
+  updateCamera(dt);
 
   drawHUD();
-  renderer.render(scene,camera);
+  render();
 }
 
 newBoard();
-drawBalls();
 drawHUD();
 showMenu();
 requestAnimationFrame(frame);

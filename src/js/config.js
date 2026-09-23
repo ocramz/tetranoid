@@ -18,6 +18,9 @@ export const HALF_W = COLS/2, HALF_H = ROWS/2;
 export const cx = c => c - HALF_W + 0.5;
 export const cy = r => r - HALF_H + 0.5;
 
+/** Seconds per row at speed 1 (touch play gets a little longer). */
+export const FALL_BASE = isCoarse ? 0.34 : 0.30;
+
 export const PIECES = [
   {n:'I', c:0x2fe0ff, m:[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]]},
   {n:'O', c:0xffd83d, m:[[1,1],[1,1]]},
