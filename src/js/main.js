@@ -6,8 +6,10 @@ import { COLS, ROWS, DANGER_ROW, SPAWN_TOP, BALL_R, PADDLE_Y, PADDLE_HH, PADDLE_
 import { Snd } from './fx/audio.js';
 import { buzz } from './fx/haptics.js';
 import { boxGeo, ghostMat, blockMat, initMaterials } from './render/materials.js';
-import { initParticles, burst, updateParts, clearParticles } from './render/particles.js';
+import { initParticles, updateParts, clearParticles } from './render/particles.js';
 import { keepAwake } from './platform/wakelock.js';
+import { emit } from './events.js';
+import { initFeedback } from './fx/feedback.js';
 
 if(isCoarse) document.body.classList.add('touch');
 
@@ -92,6 +94,7 @@ const pieceRoot = new THREE.Group(); scene.add(pieceRoot);
 const ghostRoot = new THREE.Group(); scene.add(ghostRoot);
 
 initParticles(scene);
+initFeedback(camRig);
 
 /* =========================================================
    State
@@ -164,7 +167,7 @@ function tryRotate(dir){
   for(let i=0;i<kicks.length;i++){
     if(!collides(p, p.px+kicks[i], p.py, m)){
       p.m=m; p.px+=kicks[i];
-      resetLock(); syncPiece(); Snd.tone(660,880,0.04,'triangle',0.04); buzz(6);
+      resetLock(); syncPiece(); emit('rotate');
       return;
     }
   }
@@ -239,8 +242,7 @@ function lockPiece(){
   while(pieceRoot.children.length) pieceRoot.remove(pieceRoot.children[0]);
   G.piece=null;
   G.s1+=12;
-  Snd.lock(); buzz(8);
-  camRig.shake=Math.min(camRig.shake+0.10,0.5);
+  emit('lock');
   const cleared=clearLines();
   if(top>=DANGER_ROW && cleared===0){ gameOver('stack'); return; }
   spawnPiece();
@@ -257,12 +259,14 @@ function clearLines(){
     for(let c=0;c<COLS;c++) if(!G.board[r][c]){ full=false; break; }
     if(!full) continue;
     cleared++;
+    const colors=[];
     for(let c=0;c<COLS;c++){
       const cell=G.board[r][c];
-      burst(cx(c),cy(r),cell.color,7,1.25);
+      colors.push(cell.color);
       blockRoot.remove(cell.mesh);
       G.board[r][c]=null;
     }
+    emit('rowCleared', {row:r, colors});
     for(let rr=r;rr<ROWS-1;rr++) G.board[rr]=G.board[rr+1];
     G.board[ROWS-1]=new Array(COLS).fill(null);
     r--;
@@ -272,8 +276,7 @@ function clearLines(){
     G.s1 += table[Math.min(cleared,4)]*G.level;
     G.lines+=cleared;
     retune();
-    camRig.shake=Math.min(camRig.shake+0.22*cleared,0.9);
-    Snd.line(cleared); buzz(cleared>=4?[0,25,35,25,35,25]:22);
+    emit('linesCleared', {n:cleared});
   }
   return cleared;
 }
@@ -285,17 +288,15 @@ function damageCell(row,col,fromBall){
   if(cell){
     cell.hp--;
     if(cell.hp<=0){
-      burst(cx(col),cy(row),cell.color,9,1);
       blockRoot.remove(cell.mesh);
       G.board[row][col]=null;
       if(fromBall) G.s2+=40;
-      Snd.smash(); camRig.shake=Math.min(camRig.shake+0.16,0.7);
+      emit('smash', {row, col, color:cell.color});
     } else {
       cell.mesh.material=blockMat(cell.color,true);
       cell.mesh.scale.setScalar(0.82);
-      burst(cx(col),cy(row),cell.color,3,0.6);
       if(fromBall) G.s2+=10;
-      Snd.crack(); camRig.shake=Math.min(camRig.shake+0.06,0.5);
+      emit('crack', {row, col, color:cell.color});
     }
     return;
   }
@@ -304,9 +305,8 @@ function damageCell(row,col,fromBall){
     const r=p.py-row, c=col-p.px;
     if(r>=0&&r<p.size&&c>=0&&c<p.size&&p.m[r][c]){
       p.m[r][c]=0;
-      burst(cx(col),cy(row),p.color,9,1);
       if(fromBall) G.s2+=55;
-      Snd.smash(); camRig.shake=Math.min(camRig.shake+0.18,0.7);
+      emit('chip', {row, col, color:p.color});
       buildPieceMeshes();
       if(pieceCells(p).length===0){ G.piece=null; spawnPiece(); }
     }
@@ -341,9 +341,7 @@ function serveBall(){
 function loseBall(){
   const b=G.ball; b.alive=false;
   G.balls--;
-  Snd.lost(); buzz(45);
-  burst(b.x, PADDLE_Y+0.6, 0x32e3ff, 16, 1.4);
-  camRig.shake=0.8;
+  emit('ballLost', {x:b.x});
   drawBalls();
   if(G.balls<=0){ gameOver('balls'); return; }
   G.serveT=1.1;
@@ -381,9 +379,9 @@ function updateBall(dt){
     b.x+=b.vx*sdt; hitAxis('x');
     b.y+=b.vy*sdt; hitAxis('y');
 
-    if(b.x-BALL_R < -HALF_W){ b.x=-HALF_W+BALL_R; b.vx=Math.abs(b.vx); Snd.wall(); }
-    else if(b.x+BALL_R > HALF_W){ b.x=HALF_W-BALL_R; b.vx=-Math.abs(b.vx); Snd.wall(); }
-    if(b.y-BALL_R < -HALF_H){ b.y=-HALF_H+BALL_R; b.vy=Math.abs(b.vy); Snd.wall(); }
+    if(b.x-BALL_R < -HALF_W){ b.x=-HALF_W+BALL_R; b.vx=Math.abs(b.vx); emit('wall'); }
+    else if(b.x+BALL_R > HALF_W){ b.x=HALF_W-BALL_R; b.vx=-Math.abs(b.vx); emit('wall'); }
+    if(b.y-BALL_R < -HALF_H){ b.y=-HALF_H+BALL_R; b.vy=Math.abs(b.vy); emit('wall'); }
 
     if(b.vy>0 && b.y+BALL_R > PADDLE_Y-PADDLE_HH && b.y-BALL_R < PADDLE_Y+PADDLE_HH){
       if(Math.abs(b.x-G.paddleX) < PADDLE_HW+BALL_R*0.85){
@@ -393,8 +391,7 @@ function updateBall(dt){
         const ang = off*0.95 + G.paddleVX*0.012;
         b.vx = Math.sin(ang)*b.speed;
         b.vy = -Math.abs(Math.cos(ang))*b.speed;
-        Snd.paddle(); if(!G.auto) buzz(10);
-        camRig.shake=Math.min(camRig.shake+0.1,0.45);
+        emit('paddleHit', {auto:G.auto});
       }
     }
     if(b.y > HALF_H+0.7){ loseBall(); return; }
@@ -596,8 +593,7 @@ function gameOver(why){
   if(G.state==='over') return;
   G.state='over';
   resetKeys();
-  Snd.over(); buzz([0,60,70,120]);
-  camRig.shake=1.0;
+  emit('over', {why});
   keepAwake(false);
   const ballsOut = (why==='balls');
   const head = ballsOut ? 'BALL LOST' : 'FIELD BURIED';
