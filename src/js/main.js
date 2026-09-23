@@ -1,80 +1,15 @@
 import THREE from './render/three.js';
+import { isCoarse } from './device.js';
+import { clamp, rnd, byId } from './util.js';
+import { COLS, ROWS, DANGER_ROW, SPAWN_TOP, BALL_R, PADDLE_Y, PADDLE_HH, PADDLE_HW, HALF_W, HALF_H,
+         cx, cy, PIECES } from './config.js';
+import { Snd } from './fx/audio.js';
+import { buzz } from './fx/haptics.js';
+import { boxGeo, ghostMat, blockMat, initMaterials } from './render/materials.js';
+import { initParticles, burst, updateParts, clearParticles } from './render/particles.js';
+import { keepAwake } from './platform/wakelock.js';
 
-/* =========================================================
-   Device
-   ========================================================= */
-const isCoarse = (window.matchMedia && matchMedia('(pointer:coarse)').matches)
-              || ('ontouchstart' in window) || navigator.maxTouchPoints>0;
 if(isCoarse) document.body.classList.add('touch');
-
-let haptics = true;
-function buzz(p){ if(!haptics||!navigator.vibrate) return; try{ navigator.vibrate(p); }catch(e){} }
-
-/* =========================================================
-   Board geometry
-   ========================================================= */
-const COLS = 12;
-const ROWS = 21;
-const DANGER_ROW = 13;
-const SPAWN_TOP  = 13;
-const BALL_R = 0.34;
-const PADDLE_Y = ROWS/2 - 1.0;
-const PADDLE_HH = 0.25;
-const PADDLE_HW = isCoarse ? 1.6 : 1.45;
-const HALF_W = COLS/2, HALF_H = ROWS/2;
-
-const cx = c => c - HALF_W + 0.5;
-const cy = r => r - HALF_H + 0.5;
-
-const PIECES = [
-  {n:'I', c:0x2fe0ff, m:[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]]},
-  {n:'O', c:0xffd83d, m:[[1,1],[1,1]]},
-  {n:'T', c:0xc46cff, m:[[0,1,0],[1,1,1],[0,0,0]]},
-  {n:'S', c:0x52f08c, m:[[0,1,1],[1,1,0],[0,0,0]]},
-  {n:'Z', c:0xff5468, m:[[1,1,0],[0,1,1],[0,0,0]]},
-  {n:'J', c:0x4d88ff, m:[[1,0,0],[1,1,1],[0,0,0]]},
-  {n:'L', c:0xffa02e, m:[[0,0,1],[1,1,1],[0,0,0]]}
-];
-
-const clamp = (v,a,b)=> v<a?a:(v>b?b:v);
-const rnd   = (a,b)=> a + Math.random()*(b-a);
-const byId  = id => document.getElementById(id);
-
-/* =========================================================
-   Blip synth
-   ========================================================= */
-const Snd = (function(){
-  let ctx=null, muted=false;
-  function ensure(){
-    if(!ctx){ try{ ctx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return null; } }
-    if(ctx.state==='suspended') ctx.resume();
-    return ctx;
-  }
-  function tone(f0,f1,dur,type,vol){
-    if(muted) return; const c=ensure(); if(!c) return;
-    const t=c.currentTime, o=c.createOscillator(), g=c.createGain();
-    o.type=type||'square';
-    o.frequency.setValueAtTime(f0,t);
-    if(f1&&f1!==f0) o.frequency.exponentialRampToValueAtTime(Math.max(30,f1),t+dur);
-    g.gain.setValueAtTime(0.0001,t);
-    g.gain.exponentialRampToValueAtTime(vol||0.07,t+0.008);
-    g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-    o.connect(g); g.connect(c.destination); o.start(t); o.stop(t+dur+0.03);
-  }
-  return {
-    ensure, tone,
-    toggle(){ muted=!muted; if(!muted) ensure(); return muted; },
-    isMuted(){ return muted; },
-    wall(){ tone(520,480,0.05,'square',0.035); },
-    paddle(){ tone(300,620,0.09,'square',0.07); },
-    crack(){ tone(900,600,0.05,'triangle',0.05); },
-    smash(){ tone(240,70,0.16,'sawtooth',0.07); },
-    lock(){ tone(180,140,0.07,'square',0.05); },
-    line(n){ [0,1,2,3].slice(0,n).forEach(i=>setTimeout(()=>tone(440*Math.pow(1.26,i),0,0.11,'square',0.07), i*70)); },
-    lost(){ tone(400,80,0.45,'sawtooth',0.08); },
-    over(){ [0,1,2].forEach(i=>setTimeout(()=>tone(300/(i+1),0,0.3,'square',0.08), i*160)); }
-  };
-})();
 
 /* =========================================================
    Scene
@@ -150,57 +85,13 @@ for(let i=0;i<TRAIL_N;i++){
   t.userData.p=new THREE.Vector3(); scene.add(t); trail.push(t);
 }
 
-const boxGeo = new THREE.BoxGeometry(0.92,0.92,0.92);
-const matCache = new Map();
-function blockMat(color, cracked){
-  const k = color+'|'+(cracked?1:0);
-  if(matCache.has(k)) return matCache.get(k);
-  const c = new THREE.Color(color);
-  if(cracked) c.multiplyScalar(0.42);
-  const m = new THREE.MeshStandardMaterial({
-    color:c, emissive:new THREE.Color(color).multiplyScalar(cracked?0.16:0.45),
-    roughness:cracked?0.75:0.32, metalness:0.15});
-  matCache.set(k,m); return m;
-}
-const ghostMat = new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:0.12});
+initMaterials();
 
 const blockRoot = new THREE.Group(); scene.add(blockRoot);
 const pieceRoot = new THREE.Group(); scene.add(pieceRoot);
 const ghostRoot = new THREE.Group(); scene.add(ghostRoot);
 
-const partGeo = new THREE.BoxGeometry(0.2,0.2,0.2);
-const PART_N = isCoarse ? 150 : 260;
-const parts=[];
-for(let i=0;i<PART_N;i++){
-  const m=new THREE.Mesh(partGeo, blockMat(0xffffff,false));
-  m.visible=false; scene.add(m);
-  parts.push({mesh:m, life:0, max:1, vx:0, vy:0, vz:0, rx:0, ry:0});
-}
-let partIdx=0;
-function burst(x,y,color,count,power){
-  for(let i=0;i<count;i++){
-    const p=parts[partIdx=(partIdx+1)%parts.length];
-    p.mesh.material = blockMat(color,false);
-    p.mesh.position.set(x+rnd(-0.3,0.3), y+rnd(-0.3,0.3), rnd(-0.2,0.4));
-    p.mesh.rotation.set(rnd(0,3),rnd(0,3),0);
-    p.mesh.visible=true;
-    const a=rnd(0,Math.PI*2), s=rnd(2,7)*(power||1);
-    p.vx=Math.cos(a)*s; p.vy=Math.sin(a)*s+2; p.vz=rnd(1,5);
-    p.rx=rnd(-9,9); p.ry=rnd(-9,9);
-    p.max=p.life=rnd(0.35,0.7);
-  }
-}
-function updateParts(dt){
-  for(let i=0;i<parts.length;i++){
-    const p=parts[i]; if(p.life<=0) continue;
-    p.life-=dt;
-    if(p.life<=0){ p.mesh.visible=false; continue; }
-    p.vy-=26*dt; p.vz-=10*dt;
-    p.mesh.position.x+=p.vx*dt; p.mesh.position.y+=p.vy*dt; p.mesh.position.z+=p.vz*dt;
-    p.mesh.rotation.x+=p.rx*dt; p.mesh.rotation.y+=p.ry*dt;
-    p.mesh.scale.setScalar(Math.max(0.001,p.life/p.max));
-  }
-}
+initParticles(scene);
 
 /* =========================================================
    State
@@ -676,7 +567,7 @@ function showMenu(){
   resetKeys();
   G.piece=null; G.ball.alive=false;
   clearMeshes(); newBoard();
-  parts.forEach(p=>{p.life=0;p.mesh.visible=false;});
+  clearParticles();
   keepAwake(false);
   showVeil(MENU_HTML);
   byId('btn1').onclick=()=>startGame(true);
@@ -693,7 +584,7 @@ function startGame(auto){
   setAuto(auto);
   resetKeys();
   newBoard(); clearMeshes();
-  parts.forEach(p=>{p.life=0;p.mesh.visible=false;});
+  clearParticles();
   refillBag();
   G.next=pullPiece();
   spawnPiece();
@@ -754,18 +645,6 @@ function setAuto(v){
   if(!v) G.paddleTarget=G.paddleX;
   document.body.classList.toggle('twop', !v);
   hudCache.auto=null; drawHUD();
-}
-
-/* keep the screen on while playing */
-let wakeLock=null;
-function keepAwake(on){
-  try{
-    if(on && 'wakeLock' in navigator && !wakeLock){
-      navigator.wakeLock.request('screen').then(w=>{
-        wakeLock=w; w.addEventListener('release',()=>{wakeLock=null;});
-      }).catch(()=>{});
-    } else if(!on && wakeLock){ wakeLock.release().catch(()=>{}); wakeLock=null; }
-  }catch(e){}
 }
 
 /* =========================================================

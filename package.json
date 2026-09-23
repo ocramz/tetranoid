@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "npx -y http-server@14 . -c-1 -p 8080 -o /src/",
+    "test": "node --test \"test/**/*.test.js\"",
     "vendor": "node tools/vendor.mjs"
   }
 }
