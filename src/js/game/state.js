@@ -1,4 +1,4 @@
-import { COLS, ROWS, PADDLE_Y, FALL_BASE } from '../config.js';
+import { COLS, ROWS, PADDLE_Y, LINES_PER_LEVEL, SECONDS_PER_LEVEL, FALL_BASE, FALL_DECAY, FALL_MIN } from '../config.js';
 import { emit } from '../events.js';
 
 /* =========================================================
@@ -23,9 +23,9 @@ export function newBoard(){
 
 /** The speed level follows lines cleared and time survived. */
 export function retune(){
-  const lv = 1 + Math.floor(G.lines/4) + Math.floor(G.time/50);
+  const lv = 1 + Math.floor(G.lines/LINES_PER_LEVEL) + Math.floor(G.time/SECONDS_PER_LEVEL);
   G.level = lv;
-  G.fallEvery = Math.max(0.15, FALL_BASE*Math.pow(0.90, lv-1));
+  G.fallEvery = Math.max(FALL_MIN, FALL_BASE*Math.pow(FALL_DECAY, lv-1));
 }
 
 /** End the run, once: 'stack' (the stack reached the spawn line) or 'balls' (last ball lost). */

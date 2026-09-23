@@ -1,4 +1,4 @@
-import { BALL_R, PADDLE_Y, PADDLE_HH, PADDLE_HW, HALF_W } from '../config.js';
+import { BALL_R, PADDLE_Y, PADDLE_HH, PADDLE_HW, HALF_W, AI_GAIN, AI_MAX_SPEED, PADDLE_SPEED } from '../config.js';
 import { clamp } from '../util.js';
 import { G } from './state.js';
 
@@ -26,10 +26,10 @@ export function updatePaddle(dt, dir){
   if(G.auto){
     const want=clamp(predictX()+G.aiErr, -limit, limit);
     const d=want-G.paddleX;
-    const v=clamp(d*9, -13.5, 13.5);
+    const v=clamp(d*AI_GAIN, -AI_MAX_SPEED, AI_MAX_SPEED);
     G.paddleX=clamp(G.paddleX+v*dt, -limit, limit);
   } else {
-    if(dir!==0) G.paddleTarget=clamp(G.paddleTarget+dir*17*dt,-limit,limit);
+    if(dir!==0) G.paddleTarget=clamp(G.paddleTarget+dir*PADDLE_SPEED*dt,-limit,limit);
     G.paddleTarget=clamp(G.paddleTarget,-limit,limit);
     G.paddleX += (G.paddleTarget-G.paddleX)*Math.min(1,dt*22);
   }

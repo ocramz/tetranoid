@@ -1,4 +1,5 @@
-import { COLS, ROWS, DANGER_ROW, SPAWN_TOP, PIECES } from '../config.js';
+import { COLS, ROWS, DANGER_ROW, SPAWN_TOP, PIECES, LOCK_RESETS, LOCK_SCORE, SOFT_DROP_SCORE, HARD_DROP_SCORE,
+         BLOCK_HP } from '../config.js';
 import { emit } from '../events.js';
 import { G, gameOver } from './state.js';
 import { clearLines } from './board.js';
@@ -58,7 +59,7 @@ export function movePiece(dx){
   if(!collides(p, p.px+dx, p.py)){ p.px+=dx; resetLock(); return true; }
   return false;
 }
-function resetLock(){ if(G.grounded && G.lockResets<8){ G.lockT=0; G.lockResets++; } }
+function resetLock(){ if(G.grounded && G.lockResets<LOCK_RESETS){ G.lockT=0; G.lockResets++; } }
 
 export function spawnPiece(){
   G.piece = G.next || pullPiece();
@@ -76,7 +77,7 @@ export function stepDown(soft){
   const p=G.piece; if(!p) return;
   if(!collides(p, p.px, p.py-1)){
     p.py--; G.grounded=false; G.lockT=0;
-    if(soft) G.s1+=1;
+    if(soft) G.s1+=SOFT_DROP_SCORE;
   } else G.grounded=true;
 }
 /** Sink n rows now (held S, the pad, drag down), restarting the gravity timer. */
@@ -88,7 +89,7 @@ export function hardDrop(){
   const p=G.piece; if(!p) return;
   let n=0;
   while(!collides(p,p.px,p.py-1)){ p.py--; n++; }
-  G.s1+=n*2;
+  G.s1+=n*HARD_DROP_SCORE;
   lockPiece();
 }
 export function lockPiece(){
@@ -98,11 +99,11 @@ export function lockPiece(){
   let top=-1;
   cells.forEach(([br,bc])=>{
     if(br<0||br>=ROWS||bc<0||bc>=COLS) return;
-    G.board[br][bc]={color:p.color, hp:2, r0:br};   // r0: the row it locked in
+    G.board[br][bc]={color:p.color, hp:BLOCK_HP, r0:br};   // r0: the row it locked in
     if(br>top) top=br;
   });
   G.piece=null;
-  G.s1+=12;
+  G.s1+=LOCK_SCORE;
   emit('lock');
   const cleared=clearLines();
   if(top>=DANGER_ROW && cleared===0){ gameOver('stack'); return; }

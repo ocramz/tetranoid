@@ -1,4 +1,4 @@
-import { COLS, ROWS } from '../config.js';
+import { COLS, ROWS, LINE_SCORES } from '../config.js';
 import { emit } from '../events.js';
 import { G, retune } from './state.js';
 
@@ -22,8 +22,7 @@ export function clearLines(){
     r--;
   }
   if(cleared){
-    const table=[0,100,300,500,800];
-    G.s1 += table[Math.min(cleared,4)]*G.level;
+    G.s1 += LINE_SCORES[Math.min(cleared,4)]*G.level;
     G.lines+=cleared;
     retune();
     emit('linesCleared', {n:cleared});

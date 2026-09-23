@@ -1,4 +1,6 @@
-import { ROWS, COLS, BALL_R, PADDLE_Y, PADDLE_HH, PADDLE_HW, HALF_W, HALF_H } from '../config.js';
+import { ROWS, COLS, BALL_R, PADDLE_Y, PADDLE_HH, PADDLE_HW, HALF_W, HALF_H, CRACK_SCORE, SMASH_SCORE, CHIP_SCORE,
+         RESERVE_DELAY, BALL_SPEED, BALL_SPEED_PER_LEVEL, BALL_SPEED_LEVEL_CAP, BALL_SPEEDUP, BALL_SPEED_MAX,
+         AI_ERROR } from '../config.js';
 import { clamp, rnd } from '../util.js';
 import { emit } from '../events.js';
 import { G, gameOver } from './state.js';
@@ -12,10 +14,10 @@ export function damageCell(row,col,fromBall){
     cell.hp--;
     if(cell.hp<=0){
       G.board[row][col]=null;
-      if(fromBall) G.s2+=40;
+      if(fromBall) G.s2+=SMASH_SCORE;
       emit('smash', {row, col, color:cell.color});
     } else {
-      if(fromBall) G.s2+=10;
+      if(fromBall) G.s2+=CRACK_SCORE;
       emit('crack', {row, col, color:cell.color});
     }
     return;
@@ -25,7 +27,7 @@ export function damageCell(row,col,fromBall){
     const r=p.py-row, c=col-p.px;
     if(r>=0&&r<p.size&&c>=0&&c<p.size&&p.m[r][c]){
       p.m[r][c]=0;
-      if(fromBall) G.s2+=55;
+      if(fromBall) G.s2+=CHIP_SCORE;
       emit('chip', {row, col, color:p.color});
       if(pieceCells(p).length===0){ G.piece=null; spawnPiece(); }
     }
@@ -49,12 +51,12 @@ export function serveBall(){
   const b=G.ball;
   b.x=clamp(G.paddleX,-HALF_W+1,HALF_W-1);
   b.y=PADDLE_Y-1.1;
-  b.speed=10.8+Math.min(G.level*0.35,3);
+  b.speed=BALL_SPEED+Math.min(G.level*BALL_SPEED_PER_LEVEL,BALL_SPEED_LEVEL_CAP);
   const a=rnd(-0.5,0.5);
   b.vx=Math.sin(a)*b.speed;
   b.vy=-Math.cos(a)*b.speed;
   b.alive=true;
-  G.aiErr=rnd(-0.7,0.7);
+  G.aiErr=rnd(-AI_ERROR,AI_ERROR);
   emit('serve');
 }
 function loseBall(){
@@ -62,7 +64,7 @@ function loseBall(){
   G.balls--;
   emit('ballLost', {x:b.x});
   if(G.balls<=0){ gameOver('balls'); return; }
-  G.serveT=1.1;
+  G.serveT=RESERVE_DELAY;
 }
 function hitAxis(axis){
   const b=G.ball, eps=1e-4;
@@ -105,7 +107,7 @@ export function updateBall(dt){
       if(Math.abs(b.x-G.paddleX) < PADDLE_HW+BALL_R*0.85){
         b.y = PADDLE_Y-PADDLE_HH-BALL_R-0.002;
         const off = clamp((b.x-G.paddleX)/PADDLE_HW,-1,1);
-        b.speed = Math.min(b.speed+0.22, 20);
+        b.speed = Math.min(b.speed+BALL_SPEEDUP, BALL_SPEED_MAX);
         const ang = off*0.95 + G.paddleVX*0.012;
         b.vx = Math.sin(ang)*b.speed;
         b.vy = -Math.abs(Math.cos(ang))*b.speed;

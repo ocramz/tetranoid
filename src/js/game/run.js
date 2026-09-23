@@ -1,4 +1,4 @@
-import { FALL_BASE } from '../config.js';
+import { FALL_BASE, LOCK_DELAY, BALLS, FIRST_SERVE } from '../config.js';
 import { emit } from '../events.js';
 import { G, newBoard, retune } from './state.js';
 import { refillBag, pullPiece, spawnPiece, stepDown, lockPiece } from './piece.js';
@@ -20,9 +20,9 @@ export function toMenu(){
 /** A new run; auto = the machine plays the paddle. */
 export function start(auto){
   G.state='playing';
-  G.lines=0; G.level=1; G.s1=0; G.s2=0; G.balls=3;
+  G.lines=0; G.level=1; G.s1=0; G.s2=0; G.balls=BALLS;
   G.fallEvery=FALL_BASE; G.time=0; G.bag=[]; G.next=null; G.piece=null;
-  G.paddleX=0; G.paddleTarget=0; G.serveT=0.9; G.ball.alive=false;
+  G.paddleX=0; G.paddleTarget=0; G.serveT=FIRST_SERVE; G.ball.alive=false;
   setAuto(auto);
   newBoard();
   refillBag();
@@ -45,7 +45,7 @@ export function step(dt, paddleDir){
     if(G.fallT>=G.fallEvery){ G.fallT=0; stepDown(false); }
     if(G.grounded){
       G.lockT+=dt;
-      if(G.lockT>=0.40) lockPiece();
+      if(G.lockT>=LOCK_DELAY) lockPiece();
     }
   } else if(G.state==='playing'){
     spawnPiece();

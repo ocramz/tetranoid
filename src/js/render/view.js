@@ -1,5 +1,5 @@
 import THREE from './three.js';
-import { COLS, ROWS, DANGER_ROW, cx, cy } from '../config.js';
+import { COLS, ROWS, DANGER_ROW, BLOCK_HP, cx, cy } from '../config.js';
 import { clamp } from '../util.js';
 import { on } from '../events.js';
 import { G } from '../game/state.js';
@@ -68,9 +68,9 @@ function syncBlocks(dt){
         const mesh=new THREE.Mesh(boxGeo, blockMat(cell.color,false));
         mesh.position.set(cx(c), cy(cell.r0), 0);
         blockRoot.add(mesh);
-        v={mesh, hp:2, seen:0}; blocks.set(cell, v);
+        v={mesh, hp:BLOCK_HP, seen:0}; blocks.set(cell, v);
       }
-      if(v.hp!==cell.hp){            // cracked: hp 2 → 1 (at 0 the cell is gone)
+      if(v.hp!==cell.hp){            // hit but still standing: cracked look (at 0 hp the cell is gone)
         v.hp=cell.hp;
         v.mesh.material=blockMat(cell.color,true);
         v.mesh.scale.setScalar(0.82);

@@ -1,4 +1,5 @@
 import { byId } from '../util.js';
+import { BALLS } from '../config.js';
 import { on } from '../events.js';
 import { G } from '../game/state.js';
 import { setAuto } from '../game/paddle.js';
@@ -56,7 +57,7 @@ function drawNext(){
 
 function drawBalls(){
   el.balls.innerHTML='';
-  for(let i=0;i<3;i++){
+  for(let i=0;i<BALLS;i++){
     const s=document.createElement('span');
     if(i>=G.balls) s.className='gone';
     el.balls.appendChild(s);
