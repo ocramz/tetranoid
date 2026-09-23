@@ -1,16 +1,16 @@
 import { isCoarse } from './device.js';
 import { clamp, byId } from './util.js';
-import { COLS, ROWS, DANGER_ROW, PADDLE_HW, HALF_W, FALL_BASE, cx, cy } from './config.js';
+import { PADDLE_HW, HALF_W, FALL_BASE } from './config.js';
 import { on } from './events.js';
 import { Snd } from './fx/audio.js';
 import { buzz } from './fx/haptics.js';
 import { initFeedback } from './fx/feedback.js';
-import { initScene, resize, pointerToWorldX, updateCamera, render, layout,
-         blockRoot, pieceRoot, ghostRoot, ghostPool, ballMesh, ballLight, trail, dangerLine } from './render/scene.js';
+import { initScene, resize, pointerToWorldX, updateCamera, render, layout } from './render/scene.js';
+import { initView, updateView, updateInPlay, hideGhost } from './render/view.js';
 import { updateParts, clearParticles } from './render/particles.js';
 import { keepAwake } from './platform/wakelock.js';
 import { G, newBoard, retune } from './game/state.js';
-import { refillBag, pullPiece, collides, tryRotate, movePiece, spawnPiece, stepDown, hardDrop, lockPiece } from './game/piece.js';
+import { refillBag, pullPiece, tryRotate, movePiece, spawnPiece, stepDown, hardDrop, lockPiece } from './game/piece.js';
 import { updateBall } from './game/ball.js';
 import { updatePaddle, setAuto } from './game/paddle.js';
 
@@ -19,33 +19,8 @@ if(isCoarse) document.body.classList.add('touch');
 const stage = byId('stage');
 initScene(stage, byId('pzone'));
 initFeedback();
+initView();
 
-function clearMeshes(){
-  while(blockRoot.children.length) blockRoot.remove(blockRoot.children[0]);
-  while(pieceRoot.children.length) pieceRoot.remove(pieceRoot.children[0]);
-  ghostRoot.children.forEach(m=>{ m.visible=false; });
-}
-
-/* =========================================================
-   Ghost
-   ========================================================= */
-function updateGhost(){
-  let used=0;
-  const p=G.piece;
-  if(p){
-    let dy=0;
-    while(!collides(p,p.px,p.py-dy-1) && dy<ROWS) dy++;
-    if(dy>0){
-      for(let r=0;r<p.size;r++) for(let c=0;c<p.size;c++){
-        if(!p.m[r][c] || used>=ghostPool.length) continue;
-        const m=ghostPool[used++];
-        m.position.set(cx(p.px+c), cy(p.py-r-dy), -0.05);
-        m.visible=true;
-      }
-    }
-  }
-  for(let i=used;i<ghostPool.length;i++) ghostPool[i].visible=false;
-}
 
 /* =========================================================
    HUD
@@ -143,7 +118,7 @@ function showMenu(){
   G.state='menu';
   resetKeys();
   G.piece=null; G.ball.alive=false;
-  clearMeshes(); newBoard();
+  hideGhost(); newBoard();
   clearParticles();
   keepAwake(false);
   showVeil(MENU_HTML);
@@ -160,7 +135,7 @@ function startGame(auto){
   hudCache={};
   setAuto(auto);
   resetKeys();
-  newBoard(); clearMeshes();
+  newBoard(); hideGhost();
   clearParticles();
   refillBag();
   G.next=pullPiece();
@@ -417,56 +392,12 @@ function frame(now){
 
     updateBall(dt);
     updatePaddle(dt, keys);
-    updateGhost();
+    updateInPlay();
   }
 
   updateParts(dt);
 
-  if(G.piece){
-    const tx=cx(G.piece.px), ty=cy(G.piece.py);
-    const k=1-Math.exp(-26*dt);
-    pieceRoot.position.x+=(tx-pieceRoot.position.x)*k;
-    pieceRoot.position.y+=(ty-pieceRoot.position.y)*k;
-  }
-  for(let r=0;r<ROWS;r++){
-    const row=G.board[r]; if(!row) continue;
-    for(let c=0;c<COLS;c++){
-      const cell=row[c]; if(!cell) continue;
-      const ty=cy(r);
-      if(Math.abs(cell.mesh.position.y-ty)>0.002)
-        cell.mesh.position.y+=(ty-cell.mesh.position.y)*Math.min(1,dt*16);
-    }
-  }
-
-  const b=G.ball;
-  ballMesh.visible=b.alive;
-  if(b.alive){
-    ballMesh.position.set(b.x,b.y,0);
-    ballMesh.rotation.x+=dt*4; ballMesh.rotation.y+=dt*3;
-    ballLight.position.set(b.x,b.y,1.4);
-    ballLight.intensity=2.4;
-    for(let i=trail.length-1;i>0;i--) trail[i].userData.p.copy(trail[i-1].userData.p);
-    trail[0].userData.p.set(b.x,b.y,0);
-    for(let i=0;i<trail.length;i++){
-      trail[i].position.copy(trail[i].userData.p);
-      trail[i].material.opacity=0.30*(1-i/trail.length);
-      trail[i].scale.setScalar(1-i/(trail.length*1.3));
-    }
-  } else {
-    ballLight.intensity=0;
-    trail.forEach(t=>t.material.opacity=0);
-  }
-
-  let high=0;
-  for(let r=ROWS-1;r>=0;r--){
-    let any=false;
-    for(let c=0;c<COLS;c++) if(G.board[r] && G.board[r][c]){ any=true; break; }
-    if(any){ high=r; break; }
-  }
-  const near=clamp((high-(DANGER_ROW-5))/5,0,1);
-  dangerLine.material.opacity=0.18+near*(0.35+0.3*Math.sin(tick*7));
-  dangerLine.material.color.setHex(near>0.6?0xff4d4d:0xffc63d);
-
+  updateView(dt, tick);
   updateCamera(dt);
 
   drawHUD();

@@ -1,7 +1,6 @@
 import { BALL_R, PADDLE_Y, PADDLE_HH, PADDLE_HW, HALF_W } from '../config.js';
 import { clamp } from '../util.js';
 import { G } from './state.js';
-import { paddle, paddleGlow } from '../render/scene.js'; // TEMP until the view draws from state
 
 /* =========================================================
    Paddle
@@ -37,8 +36,6 @@ export function updatePaddle(dt, keys){
     G.paddleX += (G.paddleTarget-G.paddleX)*Math.min(1,dt*22);
   }
   G.paddleVX=(G.paddleX-prev)/Math.max(dt,0.0001);
-  paddle.position.x=G.paddleX;
-  paddleGlow.position.x=G.paddleX;
 }
 /** Hand the paddle to the machine (true) or to player 2 (false). */
 export function setAuto(v){

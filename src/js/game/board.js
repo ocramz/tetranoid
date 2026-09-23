@@ -1,7 +1,6 @@
 import { COLS, ROWS } from '../config.js';
 import { emit } from '../events.js';
 import { G, retune } from './state.js';
-import { blockRoot } from '../render/scene.js'; // TEMP until the view draws from state
 
 /** Remove full rows (the rows above drop by reference) and score them; returns how many. */
 export function clearLines(){
@@ -15,7 +14,6 @@ export function clearLines(){
     for(let c=0;c<COLS;c++){
       const cell=G.board[r][c];
       colors.push(cell.color);
-      blockRoot.remove(cell.mesh);
       G.board[r][c]=null;
     }
     emit('rowCleared', {row:r, colors});

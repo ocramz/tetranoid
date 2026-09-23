@@ -2,10 +2,7 @@ import { ROWS, COLS, BALL_R, PADDLE_Y, PADDLE_HH, PADDLE_HW, HALF_W, HALF_H } fr
 import { clamp, rnd } from '../util.js';
 import { emit } from '../events.js';
 import { G, gameOver } from './state.js';
-import { pieceCells, spawnPiece, buildPieceMeshes } from './piece.js';
-// TEMP until the view draws from state:
-import { blockRoot, trail } from '../render/scene.js';
-import { blockMat } from '../render/materials.js';
+import { pieceCells, spawnPiece } from './piece.js';
 
 /* ---- destruction ---- */
 export function damageCell(row,col,fromBall){
@@ -14,13 +11,10 @@ export function damageCell(row,col,fromBall){
   if(cell){
     cell.hp--;
     if(cell.hp<=0){
-      blockRoot.remove(cell.mesh);
       G.board[row][col]=null;
       if(fromBall) G.s2+=40;
       emit('smash', {row, col, color:cell.color});
     } else {
-      cell.mesh.material=blockMat(cell.color,true);
-      cell.mesh.scale.setScalar(0.82);
       if(fromBall) G.s2+=10;
       emit('crack', {row, col, color:cell.color});
     }
@@ -33,7 +27,6 @@ export function damageCell(row,col,fromBall){
       p.m[r][c]=0;
       if(fromBall) G.s2+=55;
       emit('chip', {row, col, color:p.color});
-      buildPieceMeshes();
       if(pieceCells(p).length===0){ G.piece=null; spawnPiece(); }
     }
   }
@@ -62,7 +55,7 @@ export function serveBall(){
   b.vy=-Math.cos(a)*b.speed;
   b.alive=true;
   G.aiErr=rnd(-0.7,0.7);
-  for(let i=0;i<trail.length;i++) trail[i].userData.p.set(b.x,b.y,0);
+  emit('serve');
 }
 function loseBall(){
   const b=G.ball; b.alive=false;

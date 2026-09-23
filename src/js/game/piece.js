@@ -1,11 +1,7 @@
-import { COLS, ROWS, DANGER_ROW, SPAWN_TOP, PIECES, cx, cy } from '../config.js';
+import { COLS, ROWS, DANGER_ROW, SPAWN_TOP, PIECES } from '../config.js';
 import { emit } from '../events.js';
 import { G, gameOver } from './state.js';
 import { clearLines } from './board.js';
-// TEMP until the view draws from state:
-import THREE from '../render/three.js';
-import { blockRoot, pieceRoot } from '../render/scene.js';
-import { boxGeo, blockMat } from '../render/materials.js';
 
 /* ---- pieces ---- */
 export function refillBag(){
@@ -52,14 +48,14 @@ export function tryRotate(dir){
   for(let i=0;i<kicks.length;i++){
     if(!collides(p, p.px+kicks[i], p.py, m)){
       p.m=m; p.px+=kicks[i];
-      resetLock(); syncPiece(); emit('rotate');
+      resetLock(); emit('rotate');
       return;
     }
   }
 }
 export function movePiece(dx){
   const p=G.piece; if(!p) return false;
-  if(!collides(p, p.px+dx, p.py)){ p.px+=dx; resetLock(); syncPiece(); return true; }
+  if(!collides(p, p.px+dx, p.py)){ p.px+=dx; resetLock(); return true; }
   return false;
 }
 function resetLock(){ if(G.grounded && G.lockResets<8){ G.lockT=0; G.lockResets++; } }
@@ -68,32 +64,13 @@ export function spawnPiece(){
   G.piece = G.next || pullPiece();
   G.next  = pullPiece();
   G.fallT=0; G.lockT=0; G.lockResets=0; G.grounded=false;
-  if(collides(G.piece)){ gameOver('stack'); return; }
-  buildPieceMeshes();
-  pieceRoot.position.set(cx(G.piece.px), cy(G.piece.py), 0);
+  if(collides(G.piece)){ G.piece=null; gameOver('stack'); }   // blocked: never shown
 }
-export function buildPieceMeshes(){
-  while(pieceRoot.children.length) pieceRoot.remove(pieceRoot.children[0]);
-  const p=G.piece; if(!p) return;
-  for(let r=0;r<p.size;r++) for(let c=0;c<p.size;c++){
-    if(!p.m[r][c]) continue;
-    const mesh=new THREE.Mesh(boxGeo, blockMat(p.color,false));
-    mesh.position.set(c, -r, 0);
-    mesh.userData.rc=r*10+c;
-    pieceRoot.add(mesh);
-  }
-}
-function syncPiece(){
-  const p=G.piece; if(!p) return;
-  const have={};
-  pieceRoot.children.forEach(m=>{ have[m.userData.rc]=m; });
-  let need=0;
-  for(let r=0;r<p.size;r++) for(let c=0;c<p.size;c++) if(p.m[r][c]) need++;
-  if(need!==pieceRoot.children.length){ buildPieceMeshes(); return; }
-  let ok=true;
-  for(let r=0;r<p.size && ok;r++) for(let c=0;c<p.size && ok;c++)
-    if(p.m[r][c] && !have[r*10+c]) ok=false;
-  if(!ok) buildPieceMeshes();
+/** How far the piece can sink before it lands (the ghost shows it). */
+export function dropDistance(p){
+  let dy=0;
+  while(!collides(p,p.px,p.py-dy-1) && dy<ROWS) dy++;
+  return dy;
 }
 export function stepDown(soft){
   const p=G.piece; if(!p) return;
@@ -107,7 +84,6 @@ export function hardDrop(){
   let n=0;
   while(!collides(p,p.px,p.py-1)){ p.py--; n++; }
   G.s1+=n*2;
-  pieceRoot.position.y=cy(p.py);
   lockPiece();
 }
 export function lockPiece(){
@@ -117,13 +93,9 @@ export function lockPiece(){
   let top=-1;
   cells.forEach(([br,bc])=>{
     if(br<0||br>=ROWS||bc<0||bc>=COLS) return;
-    const mesh=new THREE.Mesh(boxGeo, blockMat(p.color,false));
-    mesh.position.set(cx(bc), cy(br), 0);
-    blockRoot.add(mesh);
-    G.board[br][bc]={color:p.color, hp:2, mesh};
+    G.board[br][bc]={color:p.color, hp:2, r0:br};   // r0: the row it locked in
     if(br>top) top=br;
   });
-  while(pieceRoot.children.length) pieceRoot.remove(pieceRoot.children[0]);
   G.piece=null;
   G.s1+=12;
   emit('lock');
