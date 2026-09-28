@@ -10,6 +10,7 @@
 }
 *,*::before,*::after{box-sizing:border-box}
 html{height:100%;-webkit-text-size-adjust:100%}
+button{touch-action:manipulation}
 body{
   height:100%;margin:0;
   display:flex;flex-direction:column;
